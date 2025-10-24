@@ -1,0 +1,260 @@
+But : enrichir l’application (UI + API + données) pour produire un rapport complet. Le PDF n’est qu’une vue export de l’état de l’app.
+⚠️ Ne modifiez pas le moteur de calcul si ce n’est pas nécessaire — on expose simplement plus de données et de sections dans l’app, puis on les réutilise pour l’export.
+
+0) Principes / non-régression
+
+Ne changez aucune formule validée (PV, IR 19 %, PS 17,2 %, abattements, surtaxe).
+
+Conservez la structure des étapes du wizard.
+
+Ajoutez des sections de résultats et des champs côté app (UI + API).
+
+Le PDF utilisera exactement ces sections/valeurs sans logique propre.
+
+1) UI (Wizard & Résultats) — AJOUTS OBLIGATOIRES
+A) Résultats (colonne sticky / page “Résultats”)
+
+Ajoutez ces sections d’application dans cet ordre. Chaque section doit être visible dans l’app et rafraîchie live quand l’utilisateur modifie un input :
+
+Données générales
+
+Adresse, Commune + INSEE, Département
+
+Type de bien, Dates achat/vente, Prix achat/vente
+
+Surface habitable (≥ 1,80 m), Annexes, DPE (si fournis)
+
+Base d’acquisition (détaillée)
+
+Prix d’achat (saisi)
+
+Frais d’acquisition : forfait 7,5 % ou réel (afficher le montant et la méthode)
+
+Travaux : forfait 15 % si ≥ 5 ans ou réel (afficher le montant et la méthode)
+
+Autres coûts d’achat
+
+Base d’acquisition totale (calculée)
+
+Plus-value & Abattements
+
+PV brute
+
+Durée de détention : X ans Y mois
+
+Abattement IR (%) et (€) — préciser “exonération IR à 22 ans”
+
+Abattement PS (%) et (€) — préciser “exonération PS à 30 ans”
+
+Fiscalité
+
+IR (19 %) : base IR, montant
+
+Prélèvements sociaux (17,2 %) : base PS, montant
+
+Surtaxe PV élevée : montant ou “0 € (PV nette ≤ 50 000 €)”
+
+Total impôts = IR + PS + surtaxe
+
+Frais de cession & prêt (nouvelle zone activable)
+Ajoutez une case “Inclure frais de cession / prêt”. Si cochée, affichez :
+
+CRD (capital restant dû)
+
+IRA (afficher la méthode retenue : % ou 6 mois d’intérêts, et la valeur min)
+
+Mainlevée
+
+Agence (vendeur)
+
+Diagnostics
+
+Prorata taxe foncière
+
+Divers
+
+Net en poche final = Prix de vente − Total impôts − (tous frais ci-dessus)
+
+Synthèse vendeurs
+
+Prix net vendeur (terme marché, sans impôts)
+
+Net en poche (avant prêt) = Prix − impôts (si la zone prêt/frais n’est pas activée)
+
+Net en poche final (si zone activée)
+
+Référentiels & versions (lecture seule)
+
+Version barèmes fiscaux : BOFiP surtaxe (URL + date), Service-Public/impots.gouv (date)
+
+Version DMTO (DGFiP) pour le département (ex. “v2025-06”, URL source)
+
+Localisation & DVF
+
+Commune/INSEE + Département
+
+3–5 comparables DVF (date, surface ou typologie dispo, prix/m²) + lien dataset
+
+S’il n’y en a pas : badge “Aucune donnée DVF disponible pour cette commune”.
+
+Horodatage & Arrondis
+
+Heure locale Europe/Paris (+ afficher UTC en petit)
+
+Règle d’arrondi : 2 décimales (arrondi commercial)
+
+B) Libellés (corrections)
+
+Renommer l’actuel “Net vendeur” qui soustrayait les impôts →
+“Net en poche (avant remboursement du prêt)”.
+
+Ajouter une ligne distincte “Prix net vendeur” (sans fiscalité).
+
+2) API — Contrats & payloads (sans casser l’existant)
+A) Entrées (déjà présentes pour la plupart)
+
+Assurez-vous que la requête de simulation accepte (et stocke dans DB) :
+
+address, insee_code, dept_code, property_type
+
+purchase_price, purchase_date, sale_price, sale_date
+
+acq_mode (FORFAIT/REEL), acq_amount (si REEL)
+
+works_mode (FORFAIT/REEL/NONE), works_amount (si REEL)
+
+other_acq_amount
+
+Zone frais/ prêt (tous optionnels) : crd, ira_mode (PCT/6MOIS), ira_pct, loan_rate_annual, mainlevee, agency_seller, diagnostics, prorata_tf, misc
+
+Surface/DPE : surface_habitable, surface_annexes, dpe_label (optionnel)
+
+B) Sorties (nouveau payload enrichi)
+
+Le POST /simulations/:id/compute doit renvoyer structuré :
+
+{
+  "general": {
+    "address": "", "insee": "", "dept": "",
+    "purchase": {"price": 0, "date": "YYYY-MM-DD"},
+    "sale": {"price": 0, "date": "YYYY-MM-DD"},
+    "surfaces": {"habitable": 0, "annexes": 0, "dpe": "C"}
+  },
+  "acquisitionBreakdown": {
+    "purchasePrice": 0,
+    "acqFees": {"method": "FORFAIT|REEL", "percent": 7.5, "amount": 0},
+    "works": {"method": "FORFAIT|REEL|NONE", "percent": 15, "amount": 0, "eligible": true},
+    "other": 0,
+    "basisTotal": 0
+  },
+  "plusValue": {
+    "pvBrute": 0,
+    "holding": {"years": 0, "months": 0}
+  },
+  "abatements": {
+    "ir": {"rate": 0, "amount": 0},
+    "ps": {"rate": 0, "amount": 0}
+  },
+  "taxes": {
+    "ir": {"base": 0, "amount": 0, "rate": 19},
+    "ps": {"base": 0, "amount": 0, "rate": 17.2},
+    "surtaxe": {"amount": 0, "applied": false, "tranche": null}
+  },
+  "feesAndLoan": {
+    "enabled": true,
+    "crd": 0, "ira": {"mode": "PCT|6MOIS", "amount": 0, "selected": "min"},
+    "mainlevee": 0, "agency": 0, "diagnostics": 0, "prorataTf": 0, "misc": 0
+  },
+  "nets": {
+    "priceNetVendeur": 0,
+    "netBeforeLoan": 0,
+    "netFinal": 0
+  },
+  "references": {
+    "bofip": {"url": "", "date": "YYYY-MM-DD"},
+    "servicePublic": {"url": "", "date": "YYYY-MM-DD"},
+    "impotsGouv": {"url": "", "date": "YYYY-MM-DD"},
+    "dmto": {"dept": "", "version": "YYYY-MM", "sourceUrl": ""},
+    "dvf": {"available": true, "count": 3}
+  },
+  "meta": {
+    "tz": "Europe/Paris", "generatedAtLocal": "YYYY-MM-DDTHH:mm",
+    "generatedAtUTC": "YYYY-MM-DDTHH:mm'Z",
+    "rounding": "2 decimals, commercial"
+  }
+}
+
+
+Important : ce payload applicatif est la source de vérité. Le front l’affiche tel quel. L’export PDF n’est qu’un render de ces sections.
+
+3) Données (DB) — Vérifier/ajuster
+
+Table simulations contient déjà les colonnes nécessaires (cf. version précédente).
+
+Ajoutez si manquants : insee_code, dept_code, dpe_label.
+
+Ajoutez une table de cache dvf_cache si pas encore en place (clé: insee+since+radius).
+
+Gardez dmto_table versionnée (colonnes version, effective_from, source_url).
+
+4) DVF & DMTO — Application (pas PDF)
+
+DMTO : au chargement de la simulation, lire dmto_table par dept_code et afficher dans l’app : “DMTO version vYYYY-MM — source : [lien]”.
+
+DVF : créer une section “Comparables DVF” dans l’app ; appeler /dvf?insee=&radius=&since= et afficher 3–5 ventes (date, prix/m², lien dataset). Si vide → badge “Aucune donnée”.
+
+5) Horodatage & fuseau — Application
+
+Dans l’en-tête de la page Résultats, afficher :
+“Généré le JJ/MM/AAAA HH:mm (Europe/Paris) — UTC : …”
+
+Faire l’horodatage côté API avec Europe/Paris (et fournir aussi l’UTC).
+
+6) Règles d’affichage (arrondis & états vides)
+
+Toujours arrondir à 2 décimales (arrondi commercial).
+
+Si abattements = 0 % : afficher la ligne quand même (“0 % / 0 €”).
+
+Si surtaxe non applicable : afficher “0 € (PV nette ≤ 50 000 €)”.
+
+Si zone “Frais de cession / prêt” désactivée : masquer la section 5) mais afficher “Net en poche (avant prêt)”.
+
+7) Acceptation (au niveau app, pas PDF)
+
+La page Résultats contient toutes les sections 1→9 ci-dessus, dans cet ordre.
+
+Les données calculées sont cohérentes avec les règles existantes.
+
+Les versions (BOFiP/Service-Public/impots.gouv/DMTO) sont visibles dans l’app.
+
+DVF affiche 3–5 comparables ou un badge d’absence.
+
+Les libellés “Prix net vendeur” / “Net en poche (avant prêt)” / “Net en poche final” sont correctement distingués.
+
+L’horodatage Europe/Paris est présent (UTC en petit).
+
+Tous les montants sont arrondis à 2 décimales.
+
+8) Étapes concrètes (ordre d’implémentation)
+
+Front : ajouter les sections Résultats (maquette simple, même design).
+
+API compute : enrichir le payload exactement comme section 2.B.
+
+DB : migrations mineures pour insee_code, dept_code, dpe_label si absents.
+
+DMTO : affichage version/source dans l’app.
+
+DVF : intégrer la section (placeholder si backend en cours).
+
+Horodatage/Arrondis : normaliser.
+
+Passage QA : vérifier 3 cas (RS 7 ans ; RP ; PV 55k → surtaxe visible).
+
+👉 Résultat attendu : l’utilisateur voit dans l’application toutes les informations d’un rapport pro (sections, montants, versions, DVF, net final).
+L’export PDF ne fera que reprendre ces blocs sans ajouter de logique.
+
+Fin du prompt.
+
+ChatGPT peut commettre des erreurs. Il est recommandé de vérifier les informations importantes. Voir les

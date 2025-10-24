@@ -1,0 +1,341 @@
+RÔLE & CONTRAT DE LIVRAISON
+Vous êtes une équipe de 10 développeurs seniors (lead FE, lead BE, data, QA, DevOps).
+Vous devez livrer CalcuNotaire Pro, un micro-SaaS de simulation notariale & fiscale pour la vente immobilière en France.
+Aucune interprétation ni réduction du périmètre : vous exécutez strictement le présent cahier des charges et ses Annexes A→H.
+Fin de mission = tous les livrables, tests, seeds, back-office, paiements, PDF et CI/CD sont en place, verts, documentés, prod-ready.
+
+1) Objet & portée (résumé exécutif)
+
+CalcuNotaire Pro calcule et produit, pour Personne Physique / SCI IR / SCI IS :
+
+Plus-value immobilière : base d’acquisition (prix + frais d’acquisition + travaux + autres), PV brute.
+
+Fiscalité particuliers : abattements (IR exonéré à 22 ans, PS à 30 ans), IR 19 %, PS 17,2 %, surtaxe > 50 000 € selon barème BOFiP exact (avec décotes).
+
+Exonérations : Résidence principale ; 1re vente autre que RP + réemploi total sous 24 mois + non-propriétaire de RP sur 4 ans.
+
+SCI IS : résultat (prix − (VNC + frais cession)), IS 15 % / 25 %, PFU 30 % si dividendes distribués.
+
+Net en poche : prix − (fiscalité) − CRD − IRA = min(3 % CRD ; 6 mois d’intérêts) − mainlevée − (agence + diagnostics + prorata TF + divers).
+
+DMTO France entière (achats) : table DGFiP versionnée par département (source maîtresse) → estimation « frais d’acquisition » (référence usager : simulateur Notaires).
+
+DVF : 3–5 comparables (INSEE + rayon), liens Etalab.
+
+Sorties : PDF certifié (formules + résultats + versions des barèmes + sources), CSV, partage lien, mentions légales.
+
+Monétisation : Paiement one-shot (29–39 €) par simulation (débloque le PDF) + abonnements (Standard/Pro/Cabinet).
+
+Back-office Admin : DMTO (import CSV & publication de version), liens de sources barémiques, bannières légales, cache DVF, webhooks Stripe, audit.
+
+Références officielles à intégrer en /docs et dans le PDF : Service-Public (plus-value), impots.gouv (plus-values imposées), BOFiP (surtaxe), DGFiP (DMTO), Etalab/DVF.
+
+2) Parcours UX — Wizard 6 étapes (verrouillé)
+
+Essentiels (blocants) :
+Rôle (PP / SCI IR / SCI IS), Occupation (RP / RS / 1re vente + réemploi), Adresse (autocomplete), Commune/INSEE, Département, Type (maison/appart/terrain/local), Prix & dates achat/vente.
+
+Acquisition & travaux :
+Frais d’acquisition = forfait 7,5 % OU montant réel ; Travaux = forfait 15 % si détention ≥ 5 ans OU réel (factures) ; Autres coûts achat.
+
+Cession & financement :
+CRD ; IRA = min(3 % du CRD ; 6 mois d’intérêts) (taux annuel si « 6 mois ») ; Mainlevée ; Agence vendeur ; Diagnostics ; Prorata TF ; Divers.
+
+SCI (si SCI) :
+SCI IR : rien de plus ; SCI IS : VNC, frais de cession imputables, dividendes distribués (PFU), seuil PME (15 %) paramétrable.
+
+Surface & DPE (facultatif) :
+Tableau pièces (nom, m², hauteur, annexe ✓) → habitable (≥1,80 m) & annexes ; infos DPE.
+
+Résultats & export :
+PV brute, abattements (IR/PS), IR, PS, surtaxe (barème exact), exonérations, net vendeur & net en poche, alertes conformité (Annexe H), DVF comparables, Paywall, PDF/CSV, partage.
+
+Panneau “Résultat live” sticky (colonne droite) sur toutes les étapes.
+
+3) Règles de calcul (normatives — sans approximation)
+
+Base acquisition = prix achat + frais acquisition (forfait 7,5 % ou réel) + travaux (forfait 15 % si ≥ 5 ans ou réel) + autres.
+
+PV brute = prix vente − base acquisition.
+
+Durée : années pleines entre dates.
+
+PP / SCI IR :
+
+Abattements légaux : IR exonéré à 22 ans, PS à 30 ans (cadence officielle).
+
+IR = base IR × 19 % ; PS = base PS × 17,2 %.
+
+Surtaxe : si PV nette taxable IR > 50 000 €, appliquer barème BOFiP exact (tranches + décotes). → Annexe A.
+
+Exonérations : RP ; 1re vente autre que RP avec réemploi total sous 24 mois et non-propriétaire de RP sur 4 ans. → Annexe B.
+
+SCI IS :
+
+Résultat = prix − (VNC + frais cession) ; IS : 15 % jusqu’au seuil PME (paramétrable), 25 % au-delà ; PFU 30 % si dividendes distribués.
+
+Prêt (IRA) : min(3 % × CRD ; 6/12 × CRD × taux_annuel).
+
+Net en poche = prix − fiscalité − CRD − IRA − mainlevée − (agence + diag + prorata TF + divers).
+
+DMTO (achats) : lire dmto_table (source DGFiP, versionnée) ; afficher version (date + source) dans l’UI & le PDF ; rappeler que simulateur Notaires est la référence usager (notre estimation est informative).
+
+DVF : renvoyer 3–5 comparables pertinents (INSEE, rayon km, période récente), avec lien Etalab.
+
+4) Architecture & livrables (monorepo)
+
+apps/web — Next.js (App Router) + React + Tailwind + TypeScript : Wizard 6 étapes, panneau « résultat live », alertes, paywall, exports PDF/CSV, partage, i18n FR, dark mode, A11Y AA.
+
+apps/api — Node/Express + TS + Zod + Prisma (PostgreSQL) : API REST, JWT httpOnly, Stripe (one-shot + abo), S3, PDF (Puppeteer), proxy DVF + cache, logs, rate-limit, audit.
+
+packages/calc-core — moteur pur (fonctions pures, sans réseau, testé ≥ 95 %).
+
+/docs — sources officielles, formules, RGPD, mentions légales.
+
+CI GitHub Actions — lint, typecheck, unit, e2e, preview deploy.
+
+Schéma Postgres (à implémenter tel quel) :
+users, properties, simulations, rooms, uploads, dmto_table (versionnée), dvf_cache, audit_logs, insee_dept (mini-seed).
+(Types et colonnes décrits dans le CDC précédent ; reprendre à l’identique.)
+
+API REST (obligatoire) :
+
+/auth (signup/login)
+
+/dmto/:dept (retourne ligne + version + source)
+
+/simulations CRUD + /simulations/:id/compute (appelle calc-core)
+
+/dvf?insee=XXXXX&radius=KM&since=YYYY (proxy + cache)
+
+/uploads (S3)
+
+/export/pdf|csv
+
+/audit/:simulation_id
+
+Webhooks Stripe : one-shot et abonnements.
+
+Paiement :
+
+One-shot : 29–39 € / simulation → déverrouille PDF certifié (horodatage + QR code + versions barèmes/DMTO) + lien partage.
+
+Abonnements : Standard / Pro / Cabinet (illimité, dossiers, exports, marque blanche).
+
+PDF certifié (obligatoire) :
+
+Inputs (synthèse), formules, résultats (bases, IR, PS, surtaxe/IS/PFU), net en poche, versions & sources (BOFiP/Service-Public/impots.gouv/DGFiP/DVF), QR code vers la simulation, horodatage, bandeau légal (Annexe F).
+
+Empreinte (hash) des inputs + des versions stockée dans audit_logs.
+
+5) Seeds & MCO
+
+DMTO France entière : /seeds/dmto_table.csv (voir Annexe C : colonnes, modèle, exemple, process d’ingestion). Source maîtresse = PDF DGFiP ; l’Admin charge le CSV et publie la version (visible en UI & PDF).
+
+INSEE ⇄ départements : mini-seed /seeds/insee_dept.csv (ex. Bouches-du-Rhône/Paris/Rhône/Gironde) → en prod, remplacer par référentiel complet.
+
+Admin user seed pour back-office.
+
+MCO : update DMTO uniquement à réception d’un nouveau PDF DGFiP → nouvelle version publiée.
+
+6) Qualité, sécurité, conformité
+
+Unit tests (calc-core) : ≥ 95 % de couverture ; golden tests pour surtaxe BOFiP (cas par tranche + seuils de décote).
+
+E2E (Playwright) : 12 scénarios obligatoires (Annexe D).
+
+RGPD : hébergement UE, chiffrement at-rest/in-transit, purge documents (ex. 5 ans), droit d’accès/suppression, registre sous-traitants (hébergeur, Stripe, S3).
+
+Accessibilité AA ; i18n FR (base).
+
+📎 ANNEXES (à implémenter telles quelles)
+Annexe A — Surtaxe (BOFiP) : barème exact + décotes
+
+Entrée : PV = plus-value nette taxable IR (après abattements — hors exonérations).
+Assujettissement : surtaxe si PV > 50 000 €.
+Formules par tranche (avec décotes légales ; implémentation stricte) :
+
+Tranche PV (€)	Taxe à appliquer
+50 001 – 60 000	0,02 × PV − (60 000 − PV) × 1/20
+60 001 – 100 000	0,02 × PV
+100 001 – 110 000	0,03 × PV − (110 000 − PV) × 1/10
+110 001 – 150 000	0,03 × PV
+150 001 – 160 000	0,04 × PV − (160 000 − PV) × 15/100
+160 001 – 200 000	0,04 × PV
+200 001 – 210 000	0,05 × PV − (210 000 − PV) × 20/100
+210 001 – 250 000	0,05 × PV
+250 001 – 260 000	0,06 × PV − (260 000 − PV) × 25/100
+> 260 000	0,06 × PV
+
+Contraintes : calcul par cédant (quote-part), exclusions spécifiques si prévues par la doctrine.
+Sorties : surtaxe_euros, tranche_label, version_bofip = { url, date }.
+(Les exemples chiffrés BOFiP doivent être reproduits en tests unitaires “golden”.)
+
+Annexe B — Exonérations à contrôler
+
+Résidence principale (RP) : exonération totale (IR, PS, surtaxe) ; les dépendances immédiates et nécessaires cédées simultanément suivent le régime RP.
+Contrôle UI : case « RP » + micro-texte rappelant l’occupation effective jusqu’à la cession.
+
+1re vente autre que RP + réemploi (CGI 150 U II-1° bis) :
+
+(a) Cédant non-propriétaire de sa RP durant les 4 années précédant la cession ;
+
+(b) Réemploi total du prix dans l’acquisition/construction de la RP sous 24 mois (travaux admissibles).
+Contrôle UI : case « réemploi total » obligatoire ; sinon alerte et imposition.
+
+Annexe C — DMTO France entière (DGFiP) : CSV & ingestion
+
+Source maîtresse : PDF DGFiP listant les taux applicables par département (dates d’effet).
+Colonnes CSV (séparateur ,, décimales .) :
+
+dept_code,dept_name,dmto_rate,commune_rate,state_addition,total_transfer,notary_fees_base,notary_fixed,version,effective_from,effective_to,source_url
+
+
+dmto_rate : part départementale (ex : 5.00), issue du PDF DGFiP.
+
+commune_rate, state_addition, total_transfer : composants estimatifs pour les frais d’acquisition.
+
+notary_fees_base (ex : 0.80) & notary_fixed (ex : 1000.00) : indications d’émoluments et débours (estimation).
+
+version = “YYYY-MM” ; effective_from = “YYYY-MM-DD” ; source_url = lien DGFiP.
+
+Extrait de seed (à compléter France entière depuis DGFiP) :
+
+13,Bouches-du-Rhône,5.00,1.20,0.10,6.30,0.80,1000.00,2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+75,Paris,5.00,1.20,0.10,6.30,0.80,1000.00,2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+33,Gironde,5.00,1.20,0.10,6.30,0.80,1000.00,2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+69,Rhône,5.00,1.20,0.10,6.30,0.80,1000.00,2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+
+
+Ingestion & publication :
+
+Back-office Admin → upload CSV → remplit dmto_table → Publier version vYYYY-MM.
+
+L’UI et le PDF affichent la version + source_url.
+
+MCO : mise à jour uniquement à réception d’un nouveau PDF DGFiP.
+
+Annexe D — Batterie de tests (obligatoire)
+
+Unit tests (packages/calc-core) : couverture ≥ 95 %
+
+Abattements durée : 4 ans (0 %), 7 ans, 21 ans, 22 ans (IR 0), 30 ans (PS 0).
+
+Surtaxe : 1 test par tranche + tests sur seuils de décote (reproduire les exemples BOFiP).
+
+RP : exonération totale.
+
+1re vente + réemploi : ✓ (réemploi total ≤ 24 mois & non-propr. RP 4 ans) → 0 ; ✗ → imposable.
+
+SCI IS : cas VNC, seuil 15 %/25 %, dividendes PFU.
+
+IRA : cas où 3 % < 6 mois ; et cas inverse.
+
+DMTO : 3 départements (4,5 % vs 5,0 %) → estimation différente, version visible.
+
+E2E (Playwright) : 12 scénarios
+RP (exonéré) ; RS 7 ans (IR/PS) ; surtaxe 55 k€ (décote) ; 1re vente + réemploi ✓/✗ ; SCI IS ; CRD+IRA (2 modes) ; DMTO 4,5 vs 5,0 ; DVF (3–5 comparables) ; paywall one-shot → PDF ; export CSV ; partage lien ; Admin publie nouvelle version DMTO → visible en front & PDF.
+
+Annexe E — Mini-seed INSEE ⇄ départements
+
+Créer insee_dept(code_commune_insee, dept_code, commune_name) + charger un mini-seed (13/75/69/33). En prod, remplacer par référentiel INSEE complet.
+
+Annexe F — Mentions légales (PDF & site)
+
+Bandeau PDF
+
+“Simulation indicative — ce document ne se substitue pas à l’avis et aux actes d’un Notaire. Les calculs s’appuient sur les sources officielles citées et sur les données saisies par l’utilisateur, sous sa responsabilité.”
+
+Sources à afficher dans le PDF
+
+Plus-value & taux : Service-Public ; impots.gouv.
+
+Surtaxe : BOFiP — barème + décotes.
+
+DMTO : DGFiP — tableau des taux (version affichée).
+
+Comparables : DVF Etalab/DGFiP (liens).
+
+Privacy/CGU (résumé) : finalité de simulation ; conservation X ans (simus) / 5 ans (docs) ; hébergement UE ; chiffrement ; sous-traitants (hébergeur, Stripe, S3) ; droits RGPD (accès, suppression).
+
+Annexe G — Back-office Admin (spéc écrans)
+
+DMTO : liste (dept, taux, version) ; import CSV ; bouton « Publier vYYYY-MM ».
+
+Surtaxe : champs url_bofip + date_version affichés (lecture/édition si MAJ lien).
+
+Mentions : éditeur rich-text (bandeau légal, CGU/Privacy).
+
+DVF : purge cache par INSEE/période ; journal d’appels.
+
+Stripe : logs webhooks, réémission.
+
+Audit : tableau audit_logs (hash inputs + versions, timestamp, user).
+
+Rôles : admin, pro, user. RLS activée (si infra supporte).
+
+Annexe H — Messages d’alerte UX (texte exact)
+
+Forfait 15 % inéligible :
+“⚠️ Le forfait 15 % n’est applicable qu’avec une détention d’au moins 5 ans. Passez en ‘Montant réel’ ou modifiez la date d’achat.”
+
+1re vente + réemploi incomplet :
+“⚠️ L’exonération ‘1re vente + réemploi’ exige le réemploi total du prix dans la RP sous 24 mois et l’absence de propriété d’une RP dans les 4 années précédant la cession. Corrigez vos cases ou choisissez ‘Résidence secondaire’.”
+
+Surtaxe :
+“ℹ️ Votre plus-value nette taxable IR dépasse 50 000 €. La surtaxe est calculée selon le barème BOFiP (voir PDF).”
+
+RP incohérence potentielle :
+“⚠️ La RP nécessite une occupation effective jusqu’à la cession et l’inclusion de dépendances simultanément. Vérifiez vos données.”
+
+DMTO (info) :
+“ℹ️ Les frais d’acquisition sont estimés d’après le tableau DGFiP (version affichée). L’outil des Notaires de France demeure la référence usager.”
+
+IRA :
+“ℹ️ L’indemnité de remboursement anticipé est le minimum entre 3 % du capital restant dû et 6 mois d’intérêts (taux annuel).”
+
+7) Plan d’exécution (ordre impératif)
+
+packages/calc-core : abattements 22/30 ans ; surtaxe BOFiP (Annexe A) ; exonérations (Annexe B) ; IRA ; net en poche ; estimateNotaryFees(dept) lisant DMTO ; helpers surface. Unit tests ≥ 95 %.
+
+apps/api : endpoints + Zod ; Stripe one-shot & abo ; DVF proxy + cache ; PDF Puppeteer ; S3 ; JWT ; logs ; rate-limit ; audit.
+
+apps/web : Wizard 6 étapes ; résultat live ; alertes (Annexe H) ; paywall ; exports ; partage.
+
+Back-office : Admin DMTO + Surtaxe + Mentions + DVF cache + Stripe webhooks (Annexe G).
+
+Seeds : dmto_table.csv (France entière, depuis PDF DGFiP), insee_dept.csv (mini), users_admin.sql.
+
+CI/CD & Docs : pipeline vert ; /docs (sources, formules, RGPD, limites).
+
+8) Critères d’acceptation (bloquants)
+
+Surtaxe = résultat au centime selon barème BOFiP (tests par tranches + décotes).
+
+DMTO : table chargée depuis PDF DGFiP ; version & source visibles en UI & PDF.
+
+IR 19 %, PS 17,2 %, abattements 22/30 ans conformes.
+
+One-shot Stripe débloque PDF certifié (horodatage + QR + versions).
+
+DVF : 3–5 comparables pertinents avec liens Etalab.
+
+Unit tests ≥ 95 % ; 12 e2e OK ; A11Y AA ; i18n FR ; RGPD.
+
+✔️ CHECKLIST de fin (à cocher avant livraison)
+
+ calc-core (95 %+) : abattements, surtaxe BOFiP, exonérations, IRA, net, DMTO, surface.
+
+ API : endpoints, Zod, Stripe (one-shot & abo), DVF cache/proxy, PDF certifié, audit.
+
+ Web : Wizard 6 étapes, panneau live, alertes, paywall, exports, partage.
+
+ Admin : DMTO (import & publier version), Surtaxe (URL/date), Mentions, DVF cache, webhooks Stripe.
+
+ Seeds : dmto_table.csv FR entière (depuis PDF DGFiP), insee_dept.csv (mini), users_admin.sql.
+
+ CI/CD : lint, typecheck, unit, e2e, preview → vert.
+
+ /docs : sources, formules, RGPD, limites, mentions légales.
+
+Fin du prompt.

@@ -1,0 +1,5 @@
+dept_code,dept_name,dmto_rate,commune_rate,state_addition,total_transfer,notary_fees_base,notary_fixed,version,effective_from,effective_to,source_url
+13,Bouches-du-Rhône,5.00,1.20,0.10,6.30,0.80,1000.00,v2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+75,Paris,5.00,1.20,0.10,6.30,0.80,1000.00,v2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+33,Gironde,5.00,1.20,0.10,6.30,0.80,1000.00,v2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations
+69,Rhône,5.00,1.20,0.10,6.30,0.80,1000.00,v2025-06,2025-06-01,,https://www.impots.gouv.fr/droits-denregistrement-consulter-les-taux-abattements-et-exonerations

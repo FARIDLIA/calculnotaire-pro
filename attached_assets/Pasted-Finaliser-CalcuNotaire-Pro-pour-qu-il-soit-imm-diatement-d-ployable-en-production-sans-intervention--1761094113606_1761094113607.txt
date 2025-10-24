@@ -1,0 +1,233 @@
+Finaliser CalcuNotaire Pro pour qu’il soit immédiatement déployable en production sans intervention ultérieure.
+L’application doit être sécurisée, monitorée, conforme RGPD, mobile-first, PWA, performante, et auto-documentée.
+Ne modifier aucune logique métier existante : uniquement compléter l’infrastructure, la configuration et les services pour être production-ready.
+
+1️⃣ DÉPLOIEMENT & ENVIRONNEMENTS
+
+Environnements : dev, staging, prod.
+
+Front (apps/web) : déployer sur Vercel.
+
+API (apps/api) : déployer sur Render ou Fly.io.
+
+Base PostgreSQL : Neon ou Supabase.
+
+Stockage S3 : Scaleway ou Wasabi.
+
+Domaines :
+
+app.calcu-notaire.fr → front
+
+api.calcu-notaire.fr → backend
+
+admin.calcu-notaire.fr → back-office admin
+
+Certificats TLS/SSL actifs partout.
+
+CI/CD GitHub Actions :
+
+Lint, typecheck, tests, build, prisma migrate deploy, déploiement.
+
+Promotion staging → prod manuelle.
+
+Secrets stockés dans GitHub Environments (jamais commités).
+
+2️⃣ FICHIER .env.example
+# API
+PORT=3001
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgres://user:pass@host:5432/dbname
+
+# Auth
+JWT_SECRET=change_me
+JWT_EXPIRES_IN=7d
+
+# Stripe
+STRIPE_PUBLIC_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# S3 storage
+S3_ENDPOINT=
+S3_REGION=
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_BUCKET=
+
+# Sentry
+SENTRY_DSN_WEB=
+SENTRY_DSN_API=
+
+# DVF cache
+DVF_CACHE_TTL_DAYS=7
+
+# PDF
+PDF_BASE_URL=https://app.calcu-notaire.fr
+
+3️⃣ OBSERVABILITÉ & SUPERVISION
+
+Logs JSON corrélés avec req-id (API & Web).
+
+Monitoring : endpoint /health (API + Web).
+
+Alertes :
+
+Sentry (erreurs web/api).
+
+UptimeRobot (disponibilité).
+
+Slack/email : erreurs > 1 %, latence p95 > 800 ms.
+
+Metrics : req/sec, latence, 4xx/5xx, CPU/RAM.
+
+Runbooks dans /docs/runbooks.md : incident API, rollback, rotation secrets, rejouer webhooks Stripe, purge DVF, restauration DB/S3.
+
+4️⃣ SÉCURITÉ & RGPD
+
+Headers : CSP stricte, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+
+Auth : JWT httpOnly + SameSite = Lax/Strict, refresh rotation.
+
+Rate-limit sur /auth, /compute.
+
+Chiffrement at-rest (DB, S3) + in-transit (TLS).
+
+Audit OWASP Top 10 (XSS, CSRF, IDOR, injections).
+
+RGPD :
+
+Hébergement UE uniquement.
+
+Registre sous-traitants (hébergeur, Stripe, S3).
+
+Conservation : 5 ans max.
+
+Droit d’accès/suppression : endpoint /me/delete.
+
+Pages publiques : /cgu, /confidentialite, /cookies.
+
+Bannière consentement (analytics off par défaut).
+
+Document /docs/rgpd.md complet.
+
+5️⃣ SAUVEGARDES & RESTAURATION
+
+Backups DB quotidiens ; rétention 30 jours.
+
+S3 versionné + lifecycle.
+
+Test restore mensuel sur staging.
+
+Scripts :
+
+npm run backup:db
+
+npm run restore:staging
+
+6️⃣ PERFORMANCE & BUDGETS
+
+Cibles Lighthouse :
+
+LCP < 2.5 s, TTI < 3.5 s, CLS < 0.1, scores ≥ 90.
+
+Optimisations : next/image, lazy load, cache headers, gzip/br, CDN.
+
+Rapport audit Lighthouse → /docs/perf.md.
+
+7️⃣ MOBILE & PWA
+
+Responsive complet (mobile-first).
+
+PWA :
+
+manifest.json (icons, colors, display standalone).
+
+service-worker.js (cache pages publiques, offline fallback).
+
+Add-to-Home-Screen prompt + splash iOS.
+
+Offline : consultation résultats 24 h (cache local).
+
+Tests : iPhone 12–15 Safari, Pixel 7–9 Chrome.
+
+Lighthouse PWA ≥ 90.
+
+Docs : /docs/pwa.md.
+
+8️⃣ PAIEMENT & FACTURATION
+
+Stripe :
+
+One-shot : 29–39 € / simulation.
+
+Abonnements : Standard / Pro / Cabinet.
+
+Webhooks idempotents + logs Admin.
+
+Facture PDF + email (Postmark/Sendgrid).
+
+TVA FR affichée.
+
+Test webhook live avant mise en prod.
+
+Page “Mes paiements” dans l’espace utilisateur.
+
+9️⃣ ANALYTICS PRODUIT
+
+PostHog / Matomo (self-host UE).
+
+Événements : completion wizard, conversion Stripe, erreurs compute.
+
+Consentement cookies obligatoire.
+
+Tableau /docs/analytics.md : schéma événements + dashboards.
+
+🔟 DOCUMENTATION TECHNIQUE À GÉNÉRER
+
+Créer dans /docs :
+
+deployment.md : CI/CD, DNS, secrets.
+
+runbooks.md : incidents / rollback.
+
+security.md : headers, rate-limit, OWASP.
+
+rgpd.md : registre, durées, droits.
+
+pwa.md : manifest, cache, tests.
+
+analytics.md : events, consentement.
+
+perf.md : budgets + audits Lighthouse.
+
+backup.md : stratégies & test restore.
+
+1️⃣1️⃣ CHECKLIST GO-LIVE (OBLIGATOIRE)
+
+ Domaines + TLS OK.
+
+ Envs séparés (dev/staging/prod).
+
+ CI/CD vert (lint/tests/e2e/build).
+
+ Sentry + UptimeRobot + alertes actives.
+
+ Backups DB/S3 testés.
+
+ PWA installable/offline OK.
+
+ CGU / Privacy / Cookies + bannière OK.
+
+ PDF signé avec versions BOFiP / DGFiP / Service-Public.
+
+ Paywall Stripe valide (one-shot & abo).
+
+ Admin DMTO → import / publication OK.
+
+ Lighthouse ≥ 90 (web + mobile).
+
+✅ Résultat attendu :
+À la livraison, Farid n’a plus qu’à renseigner les variables d’environnement (fichier .env), lancer le pipeline de déploiement, et l’application est intégralement fonctionnelle en production :
+sécurisée, monitorée, mobile, conforme RGPD et performante.
